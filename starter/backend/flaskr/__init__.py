@@ -1,6 +1,7 @@
 import os
 from flask import Flask, request, abort, jsonify, url_for
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.sql.expression import func
 from flask_cors import CORS
 import random
 
@@ -19,6 +20,8 @@ def paginate_questions(request, selection):
 
     questions = [question.format() for question in selection]
     current_questions = questions[start:end]
+
+    return current_questions
 
 def create_app(test_config=None):
   # create and configure the app
@@ -55,7 +58,7 @@ def create_app(test_config=None):
       if len(category_info) == 0:
           abort(404)
 
-      categories = {category.format() for category in category_info}
+      categories = [category.format() for category in category_info]
 
       return jsonify({
         'success': True,
@@ -84,6 +87,7 @@ def create_app(test_config=None):
       will paginate questions using def paginate_questions
       will abort if no questions are found
       '''
+
       selection = Question.query.order_by(Question.category).all()
       current_questions = paginate_questions(request, selection)
 
@@ -99,7 +103,7 @@ def create_app(test_config=None):
       return jsonify({
         'success': True,
         'questions': current_questions,
-        'total_questions' len(Question.query.all()),
+        'total_questions': len(Question.query.all()),
         'categories': 'All Categories Selected',
         'current_category': category_names
       })
@@ -112,7 +116,7 @@ def create_app(test_config=None):
   TEST: When you click the trash icon next to a question, the question will be removed.
   This removal will persist in the database and when you refresh the page.
   '''
-  @app.route('/api/questions/<int:question_id>', methods['DELETE'])
+  @app.route('/api/questions/<int:question_id>', methods=['DELETE'])
   def delete_questions(question_id):
       '''
       Delete question by questions id
@@ -152,10 +156,10 @@ def create_app(test_config=None):
   '''
 
   @app.route('/api/questions', methods=['POST'])
-  def create_questions():
+  def create_question():
       '''
       Will create or search for questions
-      If search is used questions will be paginated
+      If search is used questions will be paginated using def paginate_questions
       '''
       body = request.get_json()
 
@@ -165,28 +169,34 @@ def create_app(test_config=None):
       difficulty = body.get('difficulty')
       search = body.get('searchTerm')
 
+
       if search:
           selection = Question.query.order_by(Question.id).filter(Question.question.ilike('%{}%'.format(search)))
           current_questions = paginate_questions(request, selection)
 
           return jsonify({
-          'success':True,
-          'questions': current_questions,
-          'total_questions': len(selection.all())
+            'success': True,
+            'questions': current_questions,
+            'total_questions': len(selection.all())
           })
 
+
+
       if not question or not answer or not category or not difficulty:
-          abort(400)
+              abort(400)
+
 
       try:
           question = Question(question=question, answer=answer,
-                        difficulty=difficulty, category=category)
+                       difficulty=difficulty, category=category)
+
           question.insert()
 
+
           return jsonify({
-          'success': True,
-          'question': question.format(),
-          })
+            'success': True,
+            'question': question.format()
+            })
 
       except:
           abort(422)
@@ -225,6 +235,7 @@ def create_app(test_config=None):
       if len(current_questions) == 0:
           abort(404)
 
+      category = Category.query.get_or_404(category_id)
       category_name = category.type
 
       return jsonify ({
@@ -246,37 +257,51 @@ def create_app(test_config=None):
   one question at a time is displayed, the user is allowed to answer
   and shown whether they were correct or not.
   '''
-  @app.route('/api/play', methods=['POST'])
-  def play():
-      body = request.get_json()
-      category = body.get('quiz_category', None)
-      previous_question = body.get('previous_questions', None)
 
-      if category is not None:
-          #pull question from selected category
-          questions = Question.query.filter(Question.category == quiz_category).all()
-          current_questions = [q.format() for q in questions]
-          if previous_question:
-              random_num = choice([i for i in range(0, len(current_questions)-1) if i not in previous_question])
-          else:
-              random_num = randint(0, len(current_questions)-1)
-          return jsonify({
-            'success': True,
-            'total_questions': len(formatted_questions),
-            'current_questions': formateed_questions[random_num]
-          })
-      else:
-          questions = Question.query.all()
-          current_questions = [q.format() for q in questions]
-          if previous_question:
-              random_num = choice([i for i in range(0, len(formatted_questions)-1) if i not in previous_question])
-          else:
-              random_num = randint(0, len(formatted_questions)-1)
-          return jsonify ({
-            'success': True,
-            'total_questions': len(formatted_questions),
-            'current_question': current_questions[random_num] 
-          })
+
+  @app.route('/api/play', methods=['POST'])
+  def get_quiz_next_question():
+
+    body = request.get_json()
+    previous_questions = body.get('previous_questions', None)
+    quiz_category = body.get('quiz_category', None)
+
+    if previous_questions is None or quiz_category is None:
+        abort(400)
+
+    try:
+        quiz_category_id = int(quiz_category["id"])
+    except (KeyError, ValueError):
+        abort(400)
+
+    if (not isinstance(previous_questions, list) and
+            all(isinstance(previous_question, int) for
+                previous_question in previous_questions)):
+        abort(400)
+
+    if len(previous_questions) > 0:
+        if quiz_category_id is 0:  # query all categories
+            next_question = (Question.query.
+                             filter(~Question.id.in_(previous_questions)).
+                             order_by(func.random()).first_or_404())
+        else:
+            next_question = (Question.query.
+                             filter(Question.category == quiz_category_id,
+                                    ~Question.id.in_(previous_questions)).
+                             order_by(func.random()).first_or_404())
+    else:
+        if quiz_category_id is 0:  # query all categories
+            next_question = (Question.query.
+                             order_by(func.random()).first_or_404())
+        else:
+            next_question = (Question.query.
+                             filter(Question.category == quiz_category_id).
+                             order_by(func.random()).first_or_404())
+
+    return jsonify({
+      "success": True,
+      "question": next_question.format()
+    })
 
 
   '''
@@ -284,5 +309,27 @@ def create_app(test_config=None):
   Create error handlers for all expected errors
   including 404 and 422.
   '''
+  @app.errorhandler(404)
+  def not_found(error):
+      return jsonify({
+        'success': False,
+        'error': 404,
+        'message': 'resource not found'
+      }), 404
+  @app.errorhandler(422)
+  def unprocessable(error):
+      return jsonify({
+        'success': False,
+        'error': 422,
+        'message': 'unprocessable'
+      }), 422
+
+  @app.errorhandler(400)
+  def bad_request(error):
+      return jsonify({
+        'success': False,
+        'error': 400,
+        'message': 'bad request'
+      })
 
   return app
