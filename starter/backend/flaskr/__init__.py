@@ -257,8 +257,6 @@ def create_app(test_config=None):
   one question at a time is displayed, the user is allowed to answer
   and shown whether they were correct or not.
   '''
-
-
   @app.route('/api/play', methods=['POST'])
   def get_quiz_next_question():
 
@@ -302,6 +300,9 @@ def create_app(test_config=None):
       "success": True,
       "question": next_question.format()
     })
+
+
+
 
 
   '''
