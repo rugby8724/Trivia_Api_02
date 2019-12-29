@@ -31,7 +31,7 @@ def create_app(test_config=None):
   '''
   @TODO: Set up CORS. Allow '*' for origins. Delete the sample route after completing the TODOs
   '''
-  CORS(app, resources={r"/api/*": {"origins": "*"}})
+  CORS(app, resources={r"/*": {"origins": "*"}})
 
   '''
   @TODO: Use the after_request decorator to set Access-Control-Allow
@@ -47,22 +47,22 @@ def create_app(test_config=None):
   Create an endpoint to handle GET requests
   for all available categories.
   '''
-  @app.route('/api/categories', methods=['GET'])
+  @app.route('/categories', methods=['GET'])
   def get_categories():
-      '''
+      """
       Displays all quiz categories
       Will abort if no categories are found
-      '''
+      """
       category_info = Category.query.order_by(Category.id).all()
 
       if len(category_info) == 0:
           abort(404)
 
-      category_list = [category.format() for category in category_info]
+      categories = [category.format() for category in category_info]
 
       return jsonify({
         'success': True,
-        'categories': category_list,
+        'categories': categories,
         'total_categories': len(Category.query.all())
       })
 
@@ -80,7 +80,7 @@ def create_app(test_config=None):
   ten questions per page and pagination at the bottom of the screen for three pages.
   Clicking on the page numbers should update the questions.
   '''
-  @app.route('/api/questions', methods=['GET'])
+  @app.route('/questions', methods=['GET'])
   def get_questions():
       '''
       Displays all questions
@@ -116,7 +116,7 @@ def create_app(test_config=None):
   TEST: When you click the trash icon next to a question, the question will be removed.
   This removal will persist in the database and when you refresh the page.
   '''
-  @app.route('/api/questions/<int:question_id>', methods=['DELETE'])
+  @app.route('/questions/<int:question_id>', methods=['DELETE'])
   def delete_questions(question_id):
       '''
       Delete question by questions id
@@ -155,7 +155,7 @@ def create_app(test_config=None):
   of the questions list in the "List" tab.
   '''
 
-  @app.route('/api/questions', methods=['POST'])
+  @app.route('/questions', methods=['POST'])
   def create_question():
       '''
       Will create or search for questions
@@ -222,7 +222,7 @@ def create_app(test_config=None):
   categories in the left column will cause only questions of that
   category to be shown.
   '''
-  @app.route('/api/categories/<int:category_id>/questions', methods=['GET'])
+  @app.route('/categories/<int:category_id>/questions', methods=['GET'])
   def questions_by_category(category_id):
       '''
       Gets questions by category_id
@@ -257,7 +257,7 @@ def create_app(test_config=None):
   one question at a time is displayed, the user is allowed to answer
   and shown whether they were correct or not.
   '''
-  @app.route('/api/play', methods=['POST'])
+  @app.route('/play_quiz', methods=['POST'])
   def get_quiz_next_question():
 
     body = request.get_json()
